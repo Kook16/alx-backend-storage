@@ -1,4 +1,4 @@
-#!!/usr/bin/python3
+#!/usr/bin/python3
 '''a Python function that returns all students sorted by average score:
 '''
 from pymongo import MongoClient
