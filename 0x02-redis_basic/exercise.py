@@ -11,11 +11,13 @@ def count_calls(method: Callable) -> Callable:
     """
     Decorator to count calls to the method.
     """
+
+    key = method.__qualname__
+
     @wraps(method)
     def wrapper(self, *args, **kwargs):
         '''wrapper func'''
         # Increment the count for the method key
-        key = method.__qualname__
         self._redis.incr(key)
         # Call the original method
         return method(self, *args, **kwargs)
@@ -26,12 +28,14 @@ def call_history(method: Callable) -> Callable:
     """
     Decorator to store the history of inputs and outputs for a function.
     """
+
+    # Create input and output keys using the method's qualified name
+    input_key = f"{method.__qualname__}:inputs"
+    output_key = f"{method.__qualname__}:outputs"
+
     @wraps(method)
     def wrapper(self, *args, **kwargs):
         '''wrapper func'''
-        # Create input and output keys using the method's qualified name
-        input_key = f"{method.__qualname__}:inputs"
-        output_key = f"{method.__qualname__}:outputs"
 
         # Log input arguments to the input list in Redis
         self._redis.rpush(input_key, str(args))
@@ -44,6 +48,26 @@ def call_history(method: Callable) -> Callable:
 
         return output
     return wrapper
+
+def replay(self, method: Callable) -> None:
+        '''display the history of calls of a particular function.'''
+        # Generate input and output keys
+        input_key = f"{method.__qualname__}:inputs"
+        output_key = f"{method.__qualname__}:outputs"
+
+        # Fetch lists of inputs and outputs from Redis
+        inputs = self._redis.lrange(input_key, 0, -1)
+        outputs = self._redis.lrange(output_key, 0, -1)
+
+        # Display number of calls
+        num_calls = len(inputs)
+        print(f"{method.__qualname__} was called {num_calls} times:")
+
+        # Iterate over inputs and outputs and print formatted output
+        for args, output in zip(inputs, outputs):
+            args_str = args.decode("utf-8")
+            output_str = output.decode("utf-8")
+            print(f"{method.__qualname__}(*{args_str}) -> {output_str}")
 
 
 class Cache:
@@ -74,38 +98,8 @@ class Cache:
     def get_str(self, key: str) -> Optional[str]:
         '''Use the get method with a conversion function to
         convert to string'''
-        return self.get(key, fn=lambda d: d.decode("utf-8"))
+        return self.get(key, str)
 
     def get_int(self, key: str) -> Optional[int]:
         '''Use the get method with a conversion function to convert to int'''
-        return self.get(key, fn=int)
-
-    def replay(self, method: Callable) -> None:
-        '''display the history of calls of a particular function.'''
-        # Generate input and output keys
-        input_key = f"{method.__qualname__}:inputs"
-        output_key = f"{method.__qualname__}:outputs"
-
-        # Fetch lists of inputs and outputs from Redis
-        inputs = self._redis.lrange(input_key, 0, -1)
-        outputs = self._redis.lrange(output_key, 0, -1)
-
-        # Display number of calls
-        num_calls = len(inputs)
-        print(f"{method.__qualname__} was called {num_calls} times:")
-
-        # Iterate over inputs and outputs and print formatted output
-        for args, output in zip(inputs, outputs):
-            args_str = args.decode("utf-8")
-            output_str = output.decode("utf-8")
-            print(f"{method.__qualname__}(*{args_str}) -> {output_str}")
-
-
-if __name__ == "__main__":
-    cache = Cache()
-
-    cache.store("foo")
-    cache.store("bar")
-    cache.store(42)
-
-    cache.replay(cache.store)
+        return self.get(key, int)
