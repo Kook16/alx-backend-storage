@@ -62,6 +62,7 @@ def replay(method: Callable) -> None:
     for k, v in zip(inputs, outputs):
         print(f"{key}(*{k.decode('utf-8')}) -> {v.decode('utf-8')}")
 
+
 class Cache:
     '''cache class'''
     def __init__(self):
